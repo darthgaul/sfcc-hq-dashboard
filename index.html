@@ -118,19 +118,32 @@
         let selectedArtifact = null;
         let mobileMenuOpen = false;
 
-        /** Utility to create an HTML element with classes and content */
-        const h = (tag, classes, content = '') => {
+        /** * Utility to create an HTML element with classes, content, and optional mutation callback (mutator).
+         * @param {string} tag - The HTML tag name (e.g., 'div').
+         * @param {string} classes - Tailwind classes.
+         * @param {string | Node | Node[]} [content=''] - The content (string, single Node, or array of Nodes).
+         * @param {function(Node): void} [mutator=null] - An optional function to apply mutations (like attributes) to the created element.
+         */
+        const h = (tag, classes, content = '', mutator = null) => {
             const el = document.createElement(tag);
             if (classes) el.className = classes;
+
             if (content) {
                 if (typeof content === 'string') {
                     el.innerHTML = content;
                 } else if (Array.isArray(content)) {
-                    content.forEach(c => el.appendChild(c));
-                } else {
+                    // FIX: Only append actual DOM Node objects from the array to prevent TypeError: parameter 1 is not of type 'Node'.
+                    content.filter(c => c instanceof Node).forEach(c => el.appendChild(c));
+                } else if (content instanceof Node) {
                     el.appendChild(content);
                 }
             }
+            
+            // Apply mutator if provided (now correctly supported as the fourth argument)
+            if (typeof mutator === 'function') {
+                mutator(el);
+            }
+
             return el;
         };
 
@@ -209,6 +222,7 @@
                             return h('div', 'flex items-center justify-between', [
                                 h('span', 'text-gray-300 w-24', region),
                                 h('div', 'flex-1 mx-4 h-2 bg-gray-700 rounded-full overflow-hidden', [
+                                    // Mutator used as the 4th argument (now correctly supported)
                                     h('div', `h-full ${color}`, '', el => el.style.width = width + '%')
                                 ]),
                                 h('span', 'text-gray-400 font-mono text-sm', percent)
@@ -256,6 +270,7 @@
             const awardsRibbons = h('div', '', [
                 // Earned Rack
                 h('div', 'flex flex-wrap gap-1 mb-4', cadetProfile.awards.filter(a => a.earned).map(award => 
+                    // Mutator used as the 4th argument (now correctly supported)
                     h('div', `h-6 w-8 ${award.color} rounded-sm shadow-sm border border-black/20`, '', el => el.title = `${award.name} - Earned ${award.date}`)
                 )),
                 // Active Pursuits
@@ -265,6 +280,7 @@
                         h('span', '', `${award.progress}%`)
                     ]),
                     h('div', 'h-1.5 w-full bg-gray-800 rounded-full overflow-hidden', [
+                        // Mutator used as the 4th argument (now correctly supported)
                         h('div', `h-full ${award.color}`, '', el => el.style.width = `${award.progress}%`)
                     ])
                 ])))
@@ -386,10 +402,190 @@
             ].filter(Boolean));
         };
 
-        // Render functions for other roles (simplified)
-        const renderRegionalView = () => h('div', 'text-white p-4', 'Regional Dashboard - Implementation Pending...');
-        const renderSquadronView = () => h('div', 'text-white p-4', 'Squadron Dashboard - Implementation Pending...');
-        const renderParentView = () => h('div', 'text-white p-4', 'Parent Dashboard - Implementation Pending...');
+        // --- NEW IMPLEMENTATION: Regional View ---
+        const renderRegionalView = () => {
+            const regionalSquadrons = ['SQ-101', 'SQ-102', 'SQ-205', 'SQ-304'];
+            const totalSquadrons = regionalSquadrons.length;
+            // Filter artifacts for units in this region (mocking based on simple unit number pattern)
+            const regionalArtifacts = artifacts.filter(a => regionalSquadrons.some(unit => a.cadetName.includes(unit.slice(-3)) || a.cadetName === 'Cdt. E. Ender')); 
+            const pendingReviews = regionalArtifacts.filter(a => a.status === 'Submitted' || a.status === 'Returned').length;
+            const nextMTE = EVENTS.find(e => e.type === 'MTE');
+            const regionalCompliance = 88; // Mock value
+
+            // Mock squadron performance data
+            const squadronData = regionalSquadrons.map(unit => ({
+                unit,
+                compliance: unit === 'SQ-102' ? 75 : (Math.random() * 10 + 85).toFixed(0),
+                pending: regionalArtifacts.filter(a => a.cadetName.includes(unit.slice(-3)) || (unit === 'SQ-101' && a.cadetName === 'Cdt. E. Ender')).length, // Simple mock link
+                risk: unit === 'SQ-102' ? 'High' : 'Low'
+            }));
+
+            const content = h('div', 'space-y-6 animate-fade-in', [
+                h('div', 'grid grid-cols-1 md:grid-cols-4 gap-4', [
+                    renderStatCard("Total Squadrons", totalSquadrons.toString(), "In North-East Region", Icons.Flag),
+                    renderStatCard("Regional Compliance", `${regionalCompliance}%`, "Average Artifact Approval", Icons.Shield),
+                    renderStatCard("Pending Reviews", pendingReviews.toString(), "Across all units", Icons.FileText),
+                    renderStatCard("Next Major Event", nextMTE.date, nextMTE.title, Icons.Calendar, true),
+                ]),
+                h('div', 'grid grid-cols-1 lg:grid-cols-3 gap-6', [
+                    // Squadron Performance Table (2/3 width)
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4 flex items-center', [
+                            renderIcon(Icons.LayoutDashboard, 20),
+                            h('span', '', 'Squadron Performance Overview')
+                        ]),
+                        h('table', 'w-full text-left text-sm', [
+                            h('thead', '', h('tr', 'text-gray-500 border-b border-gray-700', [
+                                h('th', 'pb-2', 'Unit'), h('th', 'pb-2', 'Compliance %'), h('th', 'pb-2', 'Artifacts'), h('th', 'pb-2 text-right', 'Risk')
+                            ])),
+                            h('tbody', 'text-gray-300 divide-y divide-gray-800', squadronData.map(d => h('tr', '', [
+                                h('td', 'py-3 font-mono', d.unit),
+                                h('td', '', h('span', d.risk === 'High' ? 'text-red-400' : 'text-green-400', `${d.compliance}%`)),
+                                h('td', '', d.pending.toString()),
+                                h('td', 'text-right', h('span', d.risk === 'High' ? 'text-red-400' : 'text-green-400', d.risk))
+                            ])))
+                        ])
+                    ], 'lg:col-span-2'),
+
+                    // Event Calendar (1/3 width)
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4 flex items-center', [
+                            renderIcon(Icons.Calendar, 20),
+                            h('span', '', 'Regional Event Schedule')
+                        ]),
+                        h('div', 'space-y-4', EVENTS.map(e => h('div', 'border-l-2 border-gray-700 pl-3', [
+                            h('div', 'text-xs text-gray-500 uppercase tracking-wider', e.type),
+                            h('div', 'text-sm font-medium text-white', e.title),
+                            h('div', 'text-xs text-purple-400', e.date)
+                        ])))
+                    ], 'bg-gradient-to-br from-gray-800 to-gray-900')
+                ])
+            ]);
+            return content;
+        };
+
+        // --- NEW IMPLEMENTATION: Squadron View ---
+        const renderSquadronView = () => {
+            const squadronUnit = currentUser.unit; // 'SQ-101'
+            // Mocking two cadets belong to SQ-101 for demo purposes
+            const squadronCadets = USERS.filter(u => u.role === 'Cadet' && (u.unit === squadronUnit || u.name === 'Cdt. E. Ender')); 
+            const totalCadets = squadronCadets.length;
+            
+            // Filter artifacts relevant to this squadron's review
+            const artifactsForReview = artifacts.filter(a => 
+                a.cadetName.includes('Cdt. E. Ender') || a.cadetName.includes('Cdt. J. Doe') || a.cadetName.includes('Cdt. A. Smith')
+            ).filter(a => a.status === 'Submitted' || a.status === 'Returned');
+
+            const pendingCount = artifactsForReview.filter(a => a.status === 'Submitted').length;
+            const remediationCount = artifactsForReview.filter(a => a.status === 'Returned').length;
+            const reviewQueueTitle = `Artifact Review Queue (${pendingCount} New)`;
+
+            const content = h('div', 'space-y-6 animate-fade-in', [
+                h('div', 'grid grid-cols-1 md:grid-cols-4 gap-4', [
+                    renderStatCard("Total Cadets", totalCadets.toString(), `Active in ${squadronUnit}`, Icons.Users),
+                    renderStatCard("New Submissions", pendingCount.toString(), "Awaiting review", Icons.FileText),
+                    renderStatCard("Remediation Items", remediationCount.toString(), "Needs re-submission", Icons.AlertTriangle, remediationCount > 0),
+                    renderStatCard("Board Ready Cadets", '1/2', "Eligible for next promotion", Icons.Award),
+                ]),
+
+                h('div', 'grid grid-cols-1 lg:grid-cols-3 gap-6', [
+                    // Artifact Review Queue (2/3 width)
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4 flex items-center', [
+                            renderIcon(Icons.FileText, 20),
+                            h('span', '', reviewQueueTitle)
+                        ]),
+                        h('table', 'w-full text-left text-sm', [
+                            h('thead', '', h('tr', 'text-gray-500 border-b border-gray-700', [
+                                h('th', 'pb-2', 'Cadet'), h('th', 'pb-2', 'Artifact'), h('th', 'pb-2', 'Date'), h('th', 'pb-2 text-center', 'Status')
+                            ])),
+                            h('tbody', 'text-gray-300 divide-y divide-gray-800', artifactsForReview.map(a => h('tr', '', [
+                                h('td', 'py-3', a.cadetName),
+                                h('td', '', a.title),
+                                h('td', '', a.date.slice(5)), // Month/Day
+                                h('td', 'text-center', renderBadge(a.status, a.score))
+                            ])))
+                        ])
+                    ], 'lg:col-span-2'),
+
+                    // Quick Actions (1/3 width)
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4', 'Quick Actions'),
+                        h('div', 'space-y-3', [
+                            h('button', 'w-full text-left p-3 rounded-lg bg-gray-700/50 hover:bg-purple-900/50 text-white flex items-center', [
+                                renderIcon(Icons.UserCheck, 18), 'Update Roster Status'
+                            ]),
+                            h('button', 'w-full text-left p-3 rounded-lg bg-gray-700/50 hover:bg-purple-900/50 text-white flex items-center', [
+                                renderIcon(Icons.Award, 18), 'Recommend Promotion Board'
+                            ]),
+                            h('button', 'w-full text-left p-3 rounded-lg bg-gray-700/50 hover:bg-purple-900/50 text-white flex items-center', [
+                                renderIcon(Icons.Calendar, 18), 'Log Event Attendance'
+                            ]),
+                        ])
+                    ])
+                ])
+            ]);
+            return content;
+        };
+
+        // --- NEW IMPLEMENTATION: Parent View ---
+        const renderParentView = () => {
+            const cadet = USERS.find(u => u.id === currentUser.cadetId);
+            if (!cadet) return h('div', 'bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r text-red-400 font-bold', 'Cadet profile not linked. Please contact Squadron Administration.');
+
+            const myArtifacts = artifacts.filter(a => a.cadetName === cadet.name);
+            const approvedCount = myArtifacts.filter(a => a.status === 'Approved').length;
+            const remediationItems = myArtifacts.filter(a => a.score !== null && a.score < 2);
+            const currentRank = cadetProfile.promotions.find(p => p.active);
+
+            const content = h('div', 'space-y-6 animate-fade-in', [
+                h('div', 'grid grid-cols-1 md:grid-cols-3 gap-4', [
+                    renderStatCard("Cadet Rank", currentRank.rank, currentRank.name, Icons.Award),
+                    renderStatCard("Approved Artifacts", approvedCount.toString(), "Total evidence submitted", Icons.CheckCircle),
+                    renderStatCard("Pending Action", remediationItems.length.toString(), "Remediation or Review needed", Icons.AlertTriangle, remediationItems.length > 0),
+                ]),
+
+                h('div', 'grid grid-cols-1 lg:grid-cols-3 gap-6', [
+                    // Evidence Log (2/3 width)
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4 flex items-center', [
+                            renderIcon(Icons.FileText, 20),
+                            h('span', '', `${cadet.name}'s Progress Log`)
+                        ]),
+                        h('table', 'w-full text-left text-sm', [
+                            h('thead', '', h('tr', 'border-b border-gray-700 text-gray-500', [
+                                h('th', 'pb-2', 'LOE'), h('th', 'pb-2', 'Title'), h('th', 'pb-2', 'Status'), h('th', 'pb-2 text-right', 'Score')
+                            ])),
+                            h('tbody', 'text-gray-300 divide-y divide-gray-800', myArtifacts.map(a => h('tr', '', [
+                                h('td', 'py-3', h('span', 'bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded', a.loe)),
+                                h('td', '', a.title),
+                                h('td', '', renderBadge(a.status, a.score)),
+                                h('td', 'text-right font-mono', a.score > -1 ? a.score : '-')
+                            ])))
+                        ])
+                    ], 'lg:col-span-2'),
+
+                    // Contact Card (1/3 width)
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4', 'Squadron Contact'),
+                        h('div', 'space-y-4', [
+                            h('div', '', [
+                                h('div', 'text-xs text-gray-500 uppercase tracking-wider', 'Unit Leader'),
+                                h('div', 'text-white font-medium', 'Maj. C. Davis')
+                            ]),
+                            h('div', '', [
+                                h('div', 'text-xs text-gray-500 uppercase tracking-wider', 'Unit'),
+                                h('div', 'text-white font-medium', cadet.unit)
+                            ]),
+                            h('button', 'w-full text-center p-3 rounded-lg bg-purple-700 hover:bg-purple-600 text-white font-semibold flex items-center justify-center', [
+                                renderIcon(Icons.ChevronRight, 18, 'mr-2'), 'Request Status Update'
+                            ])
+                        ])
+                    ], 'bg-gradient-to-br from-gray-800 to-gray-900')
+                ])
+            ]);
+            return content;
+        };
 
 
         // --- MAIN APP LOGIC ---
