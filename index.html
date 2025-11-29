@@ -1,722 +1,536 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Shield, 
-  Users, 
-  FileText, 
-  AlertTriangle, 
-  CheckCircle, 
-  BarChart3, 
-  Calendar, 
-  Lock, 
-  ChevronRight, 
-  Menu,
-  X,
-  UserCheck,
-  Flag,
-  LayoutDashboard,
-  Award,
-  Clock,
-  ChevronUp
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFCC Operations Dashboard</title>
+    <!-- Load Tailwind CSS via CDN for single-file deployment -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --purple-500: #a855f7;
+            --purple-600: #9333ea;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease-out;
+        }
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* bg-gray-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--purple-500);
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .promotion-timeline {
+            position: relative;
+            border-left: 2px solid #374151; /* gray-700 */
+            margin-left: 8px;
+            padding-left: 1rem;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        .timeline-item-dot {
+            position: absolute;
+            left: -19px; /* Adjust to center dot over line */
+            top: 4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid #000; /* For contrast */
+        }
 
-// --- MOCK DATA (Simulating SharePoint Lists) ---
+        /* --- Mobile Menu Fix: Ensure sidebar is visible when opened --- */
+        @media (max-width: 1023px) { /* Up to lg breakpoint */
+            /* This overrides the default -translate-x-full when mobileMenuOpen is true */
+            #sidebar[data-menu-state="open"] {
+                transform: translateX(0);
+            }
+        }
+    </style>
+    <script type="module">
+        // Import Lucide icons dynamically to use in the HTML
+        // NOTE: These imports provide functions that return SVG markup when called.
+        import { Shield, Users, FileText, AlertTriangle, CheckCircle, BarChart3, Calendar, Lock, ChevronRight, Menu, X, UserCheck, Flag, LayoutDashboard, Award, Clock, ChevronUp } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
 
-const USERS = [
-  { id: 'u1', name: 'Gen. A. Smith', role: 'HQ', title: 'Chief of Operations' },
-  { id: 'u2', name: 'Col. B. Miller', role: 'Regional', region: 'North-East' },
-  { id: 'u3', name: 'Maj. C. Davis', role: 'Squadron', unit: 'SQ-101' },
-  { id: 'u4', name: 'Cdt. E. Ender', role: 'Cadet', unit: 'SQ-101', grade: 'C/SSgt' },
-  { id: 'u5', name: 'Mrs. Ender', role: 'Parent', cadetId: 'u4' },
-];
+        // Map component names to actual functions/classes (required for dynamic icons)
+        const Icons = { Shield, Users, FileText, AlertTriangle, CheckCircle, BarChart3, Calendar, Lock, ChevronRight, Menu, X, UserCheck, Flag, LayoutDashboard, Award, Clock, ChevronUp };
 
-const INITIAL_ARTIFACTS = [
-  { id: 101, cadetName: 'Cdt. E. Ender', loe: 'STEM', title: 'Rocketry Lab Report', score: 3, status: 'Approved', safetyCheck: true, boardReady: true, date: '2023-10-01' },
-  { id: 102, cadetName: 'Cdt. E. Ender', loe: 'Leadership', title: 'Squadron Drill Cmd', score: 1, status: 'Returned', safetyCheck: true, boardReady: false, date: '2023-10-05' }, // Remediation item
-  { id: 103, cadetName: 'Cdt. J. Doe', loe: 'Fitness', title: '1 Mile Run Log', score: 0, status: 'Submitted', safetyCheck: false, boardReady: false, date: '2023-10-10' }, // Pending Review
-  { id: 104, cadetName: 'Cdt. E. Ender', loe: 'Service', title: 'Community Cleanup', score: 4, status: 'Approved', safetyCheck: true, boardReady: true, date: '2023-09-15' },
-  { id: 105, cadetName: 'Cdt. A. Smith', loe: 'STEM', title: 'Cyber Security Basics', score: 2, status: 'Submitted', safetyCheck: true, boardReady: false, date: '2023-10-12' },
-];
+        // --- MOCK DATA ---
+        const USERS = [
+            { id: 'u1', name: 'Gen. A. Smith', role: 'HQ', title: 'Chief of Operations' },
+            { id: 'u2', name: 'Col. B. Miller', role: 'Regional', region: 'North-East' },
+            { id: 'u3', name: 'Maj. C. Davis', role: 'Squadron', unit: 'SQ-101' },
+            { id: 'u4', name: 'Cdt. E. Ender', role: 'Cadet', unit: 'SQ-101', grade: 'C/SSgt' },
+            { id: 'u5', name: 'Mrs. Ender', role: 'Parent', cadetId: 'u4' },
+        ];
 
-const EVENTS = [
-  { id: 1, title: 'Regional FTX (MTE)', date: '2023-11-10', type: 'MTE', recovery: true },
-  { id: 2, title: 'Squadron Meeting', date: '2023-11-15', type: 'Regular', recovery: false },
-  { id: 3, title: 'Annual Inspection', date: '2023-12-01', type: 'MTE', recovery: true },
-];
+        let artifacts = [
+            { id: 101, cadetName: 'Cdt. E. Ender', loe: 'STEM', title: 'Rocketry Lab Report', score: 3, status: 'Approved', safetyCheck: true, boardReady: true, date: '2023-10-01' },
+            { id: 102, cadetName: 'Cdt. E. Ender', loe: 'Leadership', title: 'Squadron Drill Cmd', score: 1, status: 'Returned', safetyCheck: true, boardReady: false, date: '2023-10-05' }, // Remediation item
+            { id: 103, cadetName: 'Cdt. J. Doe', loe: 'Fitness', title: '1 Mile Run Log', score: 0, status: 'Submitted', safetyCheck: false, boardReady: false, date: '2023-10-10' }, // Pending Review
+            { id: 104, cadetName: 'Cdt. E. Ender', loe: 'Service', title: 'Community Cleanup', score: 4, status: 'Approved', safetyCheck: true, boardReady: true, date: '2023-09-15' },
+            { id: 105, cadetName: 'Cdt. A. Smith', loe: 'STEM', title: 'Cyber Security Basics', score: 2, status: 'Submitted', safetyCheck: true, boardReady: false, date: '2023-10-12' },
+        ];
 
-// --- HELPER COMPONENTS ---
+        const EVENTS = [
+            { id: 1, title: 'Regional FTX (MTE)', date: '2023-11-10', type: 'MTE', recovery: true },
+            { id: 2, title: 'Squadron Meeting', date: '2023-11-15', type: 'Regular', recovery: false },
+            { id: 3, title: 'Annual Inspection', date: '2023-12-01', type: 'MTE', recovery: true },
+        ];
 
-const Card = ({ children, className = '' }) => (
-  <div className={`bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-5 ${className}`}>
-    {children}
-  </div>
-);
+        const cadetProfile = {
+            joinDate: 'Aug 15, 2022',
+            promotions: [
+                { rank: 'C/SSgt', name: 'Staff Sergeant', date: 'Oct 01, 2023', active: true },
+                { rank: 'C/SrA', name: 'Senior Airman', date: 'Feb 15, 2023' },
+                { rank: 'C/Amn', name: 'Airman', date: 'Sep 01, 2022' }
+            ],
+            awards: [
+                { name: 'Honor Flight Ribbon', earned: true, date: '2023-06-10', color: 'bg-yellow-500', type: 'Service' },
+                { name: 'Physical Excellence', earned: true, date: '2022-12-10', color: 'bg-green-600', type: 'Fitness' },
+                { name: 'Leadership Basics', earned: true, date: '2022-09-30', color: 'bg-blue-600', type: 'Leadership' },
+                { name: 'Cyber CyberBadge', earned: false, progress: 80, color: 'bg-indigo-500', type: 'STEM' },
+                { name: 'Community Service', earned: false, progress: 45, color: 'bg-red-500', type: 'Service' }
+            ]
+        };
 
-const Badge = ({ status, score }) => {
-  let color = 'bg-gray-600 text-gray-200';
-  if (status === 'Approved') color = 'bg-green-900 text-green-200 border border-green-700';
-  if (status === 'Returned' || (score !== null && score < 2)) color = 'bg-red-900 text-red-200 border border-red-700';
-  if (status === 'Submitted') color = 'bg-yellow-900 text-yellow-200 border border-yellow-700';
-  
-  return (
-    <span className={`px-2 py-1 rounded text-xs font-mono uppercase tracking-wider ${color}`}>
-      {status}
-    </span>
-  );
-};
+        // --- STATE & UTILS ---
+        let currentUser = USERS[0]; // Initial state
+        let selectedArtifact = null;
+        let mobileMenuOpen = false;
 
-const StatCard = ({ title, value, subtext, icon: Icon, alert = false }) => (
-  <Card className="flex items-center space-x-4">
-    <div className={`p-3 rounded-full ${alert ? 'bg-red-900/50 text-red-400' : 'bg-purple-900/50 text-purple-400'}`}>
-      <Icon size={24} />
-    </div>
-    <div>
-      <h3 className="text-gray-400 text-sm uppercase tracking-wider font-semibold">{title}</h3>
-      <div className="text-2xl font-bold text-white font-mono">{value}</div>
-      {subtext && <div className="text-xs text-gray-500 mt-1">{subtext}</div>}
-    </div>
-  </Card>
-);
+        /** Utility to create an HTML element with classes and content */
+        const h = (tag, classes, content = '') => {
+            const el = document.createElement(tag);
+            if (classes) el.className = classes;
+            if (content) {
+                if (typeof content === 'string') {
+                    el.innerHTML = content;
+                } else if (Array.isArray(content)) {
+                    content.forEach(c => el.appendChild(c));
+                } else {
+                    el.appendChild(content);
+                }
+            }
+            return el;
+        };
 
-// --- VIEWS ---
+        /** Renders a Lucide icon as an SVG element (FIXED) */
+        const renderIcon = (Icon, size = 20, classes = 'mr-2') => {
+            const container = document.createElement('div');
+            container.className = classes;
+            container.style.width = `${size}px`;
+            container.style.height = `${size}px`;
+            
+            let svgMarkup = '';
 
-const HQView = ({ artifacts }) => {
-  // Mock Metrics
-  const remediationRate = Math.round((artifacts.filter(a => a.score < 2 && a.score > 0).length / artifacts.length) * 100);
-  
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Total Cadets" value="1,240" subtext="+12% YoY Growth" icon={Users} />
-        <StatCard title="Compliance Rate" value="94%" subtext="Q3 Reports Submitted" icon={Shield} />
-        <StatCard title="Remediation Rate" value={`${remediationRate}%`} subtext="Artifacts Scoring < 2" icon={AlertTriangle} alert={remediationRate > 15} />
-        <StatCard title="Waiver Logs" value="3" subtext="Pending Approval" icon={FileText} />
-      </div>
+            // CRITICAL FIX: Ensure the Icon is a function before calling it, otherwise fall back to empty/placeholder
+            if (typeof Icon === 'function') {
+                // Call the Icon function directly, passing props
+                svgMarkup = Icon({ class: 'w-full h-full' });
+            } else {
+                console.warn("Lucide Icon variable is not a function:", Icon);
+                // Fallback icon (X) to prevent crash
+                svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+            }
+            
+            container.innerHTML = svgMarkup;
+            return container;
+        };
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <h3 className="text-lg font-bold text-purple-400 mb-4 flex items-center">
-            <BarChart3 className="mr-2" size={20} /> National Compliance Heatmap
-          </h3>
-          <div className="space-y-3">
-            {['North-East', 'South-East', 'Central', 'West-Coast'].map((region, idx) => (
-              <div key={region} className="flex items-center justify-between">
-                <span className="text-gray-300 w-24">{region}</span>
-                <div className="flex-1 mx-4 h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${idx === 2 ? 'bg-red-500' : 'bg-purple-500'}`} 
-                    style={{ width: `${[92, 88, 65, 95][idx]}%` }}
-                  ></div>
-                </div>
-                <span className="text-gray-400 font-mono text-sm">{[92, 88, 65, 95][idx]}%</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        const renderBadge = (status, score) => {
+            let color = 'bg-gray-600 text-gray-200';
+            if (status === 'Approved') color = 'bg-green-900/50 text-green-200 border border-green-700';
+            if (status === 'Returned' || (score !== null && score < 2)) color = 'bg-red-900/50 text-red-200 border border-red-700';
+            if (status === 'Submitted') color = 'bg-yellow-900/50 text-yellow-200 border border-yellow-700';
 
-        <Card>
-          <h3 className="text-lg font-bold text-purple-400 mb-4 flex items-center">
-            <AlertTriangle className="mr-2" size={20} /> Critical Risk / Waiver Log
-          </h3>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-gray-500 border-b border-gray-700">
-                <th className="pb-2">Unit</th>
-                <th className="pb-2">Issue</th>
-                <th className="pb-2">Risk Level</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-300">
-              <tr className="border-b border-gray-800">
-                <td className="py-2">SQ-404</td>
-                <td>Missing Youth Protection Certs</td>
-                <td className="text-red-400">HIGH</td>
-              </tr>
-              <tr className="border-b border-gray-800">
-                <td className="py-2">SQ-102</td>
-                <td>Safety Ratio Waiver Request</td>
-                <td className="text-yellow-400">MED</td>
-              </tr>
-            </tbody>
-          </table>
-        </Card>
-      </div>
-    </div>
-  );
-};
+            return h('span', `px-2 py-1 rounded text-xs font-mono uppercase tracking-wider ${color}`, status);
+        };
 
-const RegionalView = () => (
-  <div className="space-y-6 animate-fade-in">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <StatCard title="Squadrons Active" value="12" icon={LayoutDashboard} />
-      <StatCard title="Avg Rubric Score" value="3.2" subtext="Target: 3.0" icon={CheckCircle} />
-      <StatCard title="Audit Flags" value="2" subtext="Distribution irregularities" icon={Flag} alert={true} />
-    </div>
+        const renderCard = (content, classes = '') => {
+            return h('div', `bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-5 ${classes}`, content);
+        };
 
-    <Card>
-      <h3 className="text-lg font-bold text-purple-400 mb-4">Squadron Leaderboard</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-900 text-gray-400">
-            <tr>
-              <th className="p-3">Squadron</th>
-              <th className="p-3">Commander</th>
-              <th className="p-3">Rubric Avg</th>
-              <th className="p-3">Retention %</th>
-              <th className="p-3">Distribution Check</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-700 text-gray-300">
-            <tr>
-              <td className="p-3 font-mono text-white">SQ-101</td>
-              <td className="p-3">Maj. Davis</td>
-              <td className="p-3 text-green-400">3.4</td>
-              <td className="p-3">95%</td>
-              <td className="p-3"><span className="text-green-500 flex items-center"><CheckCircle size={14} className="mr-1"/> Balanced</span></td>
-            </tr>
-            <tr>
-              <td className="p-3 font-mono text-white">SQ-105</td>
-              <td className="p-3">Capt. Lee</td>
-              <td className="p-3 text-yellow-400">2.1</td>
-              <td className="p-3">82%</td>
-              <td className="p-3"><span className="text-red-500 flex items-center"><AlertTriangle size={14} className="mr-1"/> Late Surge</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  </div>
-);
+        const renderStatCard = (title, value, subtext, Icon, alert = false) => {
+            const iconDiv = h('div', `p-3 rounded-full ${alert ? 'bg-red-900/50 text-red-400' : 'bg-purple-900/50 text-purple-400'}`, renderIcon(Icon, 24, ''));
+            const contentDiv = h('div', '', [
+                h('h3', 'text-gray-400 text-sm uppercase tracking-wider font-semibold', title),
+                h('div', 'text-2xl font-bold text-white font-mono', value),
+                subtext ? h('div', 'text-xs text-gray-500 mt-1', subtext) : null
+            ].filter(Boolean));
 
-const SquadronView = ({ artifacts, onUpdateArtifact }) => {
-  const [selectedArtifact, setSelectedArtifact] = useState(null);
-  
-  // Filter for review queue
-  const reviewQueue = artifacts.filter(a => a.status === 'Submitted');
+            return renderCard([iconDiv, contentDiv], 'flex items-center space-x-4');
+        };
 
-  const handleScore = (score) => {
-    if (!selectedArtifact) return;
-    const isRemediation = score < 2;
-    const newStatus = isRemediation ? 'Returned' : 'Approved';
-    onUpdateArtifact(selectedArtifact.id, { 
-      score, 
-      status: newStatus,
-      // Reset board ready if failed
-      boardReady: isRemediation ? false : selectedArtifact.boardReady 
-    });
-    setSelectedArtifact(null);
-  };
+        // --- VIEWS ---
 
-  const toggleSafety = (id, currentVal) => {
-    onUpdateArtifact(id, { safetyCheck: !currentVal });
-  };
+        const renderHQView = () => {
+            // ... (HQView logic here, using h() for HTML elements) ...
+            const remediationRate = Math.round((artifacts.filter(a => a.score < 2 && a.score > 0).length / artifacts.length) * 100);
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-end">
-        <h2 className="text-2xl font-bold text-white">Command Deck</h2>
-        <div className="text-sm text-gray-400">Pending Reviews: <span className="text-white font-mono text-lg">{reviewQueue.length}</span></div>
-      </div>
+            const content = h('div', 'space-y-6 animate-fade-in', [
+                h('div', 'grid grid-cols-1 md:grid-cols-4 gap-4', [
+                    renderStatCard("Total Cadets", "1,240", "+12% YoY Growth", Icons.Users),
+                    renderStatCard("Compliance Rate", "94%", "Q3 Reports Submitted", Icons.Shield),
+                    renderStatCard("Remediation Rate", `${remediationRate}%`, "Artifacts Scoring < 2", Icons.AlertTriangle, remediationRate > 15),
+                    renderStatCard("Waiver Logs", "3", "Pending Approval", Icons.FileText),
+                ]),
+                // ... (Heatmap and Risk Log - simplified) ...
+                h('div', 'grid grid-cols-1 lg:grid-cols-2 gap-6', [
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4 flex items-center', [
+                            renderIcon(Icons.BarChart3, 20),
+                            h('span', '', 'National Compliance Heatmap')
+                        ]),
+                        // Simplified Heatmap
+                        h('div', 'space-y-3', ['North-East (92%)', 'South-East (88%)', 'Central (65%)', 'West-Coast (95%)'].map((text, idx) => {
+                            const [region, percent] = text.split(' ');
+                            const width = percent.slice(1, -2);
+                            const color = idx === 2 ? 'bg-red-500' : 'bg-purple-500';
+                            return h('div', 'flex items-center justify-between', [
+                                h('span', 'text-gray-300 w-24', region),
+                                h('div', 'flex-1 mx-4 h-2 bg-gray-700 rounded-full overflow-hidden', [
+                                    h('div', `h-full ${color}`, '', el => el.style.width = width + '%')
+                                ]),
+                                h('span', 'text-gray-400 font-mono text-sm', percent)
+                            ]);
+                        }))
+                    ]),
+                    renderCard([
+                        h('h3', 'text-lg font-bold text-purple-400 mb-4 flex items-center', [
+                            renderIcon(Icons.AlertTriangle, 20),
+                            h('span', '', 'Critical Risk / Waiver Log')
+                        ]),
+                        h('table', 'w-full text-left text-sm', [
+                            h('thead', '', h('tr', 'text-gray-500 border-b border-gray-700', [
+                                h('th', 'pb-2', 'Unit'), h('th', 'pb-2', 'Issue'), h('th', 'pb-2', 'Risk Level')
+                            ])),
+                            h('tbody', 'text-gray-300', [
+                                h('tr', 'border-b border-gray-800', [h('td', 'py-2', 'SQ-404'), h('td', '', 'Missing Youth Protection Certs'), h('td', 'text-red-400', 'HIGH')]),
+                                h('tr', 'border-b border-gray-800', [h('td', 'py-2', 'SQ-102'), h('td', '', 'Safety Ratio Waiver Request'), h('td', 'text-yellow-400', 'MED')])
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+            return content;
+        };
+        
+        // Function to render the Cadet View (focus of the request)
+        const renderCadetView = () => {
+            const myArtifacts = artifacts.filter(a => a.cadetName === 'Cdt. E. Ender');
+            const remediationItems = myArtifacts.filter(a => a.score !== null && a.score < 2);
+            const currentRank = cadetProfile.promotions.find(p => p.active);
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Review Queue Column */}
-        <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-purple-400 font-bold uppercase text-sm tracking-wider">Artifact Review Queue</h3>
-          {reviewQueue.length === 0 ? (
-            <div className="p-8 bg-gray-800 rounded border border-gray-700 text-center text-gray-500 italic">
-              All clear, Commander. No pending artifacts.
+            // 1. Personnel Header (Photo, Rank, Promotions, Awards)
+            const promotionLog = h('div', 'promotion-timeline', cadetProfile.promotions.map(p => {
+                const dotClasses = p.active ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-gray-600';
+                return h('div', 'timeline-item', [
+                    h('div', `timeline-item-dot ${dotClasses}`),
+                    h('div', 'flex justify-between items-center', [
+                        h('span', `font-mono font-bold ${p.active ? 'text-white' : 'text-gray-500'}`, p.rank),
+                        h('span', 'text-xs text-gray-600', p.date)
+                    ])
+                ]);
+            }));
+
+            const awardsRibbons = h('div', '', [
+                // Earned Rack
+                h('div', 'flex flex-wrap gap-1 mb-4', cadetProfile.awards.filter(a => a.earned).map(award => 
+                    h('div', `h-6 w-8 ${award.color} rounded-sm shadow-sm border border-black/20`, '', el => el.title = `${award.name} - Earned ${award.date}`)
+                )),
+                // Active Pursuits
+                h('div', 'space-y-3', cadetProfile.awards.filter(a => !a.earned).map(award => h('div', '', [
+                    h('div', 'flex justify-between text-[10px] uppercase tracking-wide mb-1 text-gray-400', [
+                        h('span', '', award.name),
+                        h('span', '', `${award.progress}%`)
+                    ]),
+                    h('div', 'h-1.5 w-full bg-gray-800 rounded-full overflow-hidden', [
+                        h('div', `h-full ${award.color}`, '', el => el.style.width = `${award.progress}%`)
+                    ])
+                ])))
+            ]);
+
+
+            const personnelHeader = renderCard([
+                h('div', 'flex flex-col md:flex-row gap-6 items-start w-full', [
+                    // Photo & Rank Column
+                    h('div', 'flex-shrink-0 flex flex-col items-center space-y-3 w-full md:w-auto', [
+                        h('div', 'relative', [
+                            h('img', 'rounded-lg border-2 border-gray-600 shadow-xl object-cover', '', el => {
+                                el.src = "https://placehold.co/150x200/334155/white?text=Cadet+Photo";
+                                el.alt = "Cadet";
+                            }),
+                            h('div', 'absolute -bottom-3 -right-3', h('img', 'rounded-full border-4 border-gray-800 shadow-lg', '', el => {
+                                el.src = "https://placehold.co/48x48/4c1d95/white?text=Rk";
+                                el.alt = "Rank Insignia";
+                            }))
+                        ]),
+                        h('div', 'text-center', [
+                            h('h2', 'text-xl font-bold text-white', currentRank.rank),
+                            h('p', 'text-xs text-purple-400 uppercase tracking-widest font-bold', currentRank.name)
+                        ])
+                    ]),
+
+                    // Bio & Stats Column
+                    h('div', 'flex-grow w-full', [
+                        h('div', 'flex justify-between items-start mb-6', [
+                            h('div', '', [
+                                h('h2', 'text-3xl font-bold text-white', 'Cadet E. Ender'),
+                                h('div', 'flex items-center text-gray-400 mt-1 space-x-4 text-sm', [
+                                    h('span', 'flex items-center', [renderIcon(Icons.Users, 14, 'mr-1'), h('span', '', 'Squadron 101')]),
+                                    h('span', 'flex items-center', [renderIcon(Icons.Clock, 14, 'mr-1'), h('span', '', `Joined ${cadetProfile.joinDate}`)])
+                                ])
+                            ]),
+                            h('div', 'hidden md:block text-right', [
+                                h('div', 'text-xs text-gray-500 uppercase tracking-wider', 'Next Evaluation'),
+                                h('div', 'text-lg font-mono text-white', 'Dec 15, 2023')
+                            ])
+                        ]),
+
+                        h('div', 'grid grid-cols-1 md:grid-cols-2 gap-4', [
+                            // Promotion Log
+                            h('div', 'bg-gray-900/50 p-4 rounded border border-gray-700', [
+                                h('h4', 'text-xs font-bold text-purple-400 uppercase tracking-wider mb-4 flex items-center', [
+                                    renderIcon(Icons.ChevronUp, 14, 'mr-1'),
+                                    h('span', '', 'Promotion Log')
+                                ]),
+                                promotionLog
+                            ]),
+                            // Awards & Ribbons
+                            h('div', 'bg-gray-900/50 p-4 rounded border border-gray-700', [
+                                h('h4', 'text-xs font-bold text-purple-400 uppercase tracking-wider mb-4 flex items-center', [
+                                    renderIcon(Icons.Award, 14, 'mr-1'),
+                                    h('span', '', 'Awards & Pursuits')
+                                ]),
+                                awardsRibbons
+                            ])
+                        ])
+                    ])
+                ])
+            ], 'w-full');
+
+            // 2. Warnings
+            const remediationWarning = remediationItems.length > 0 ? h('div', 'bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r flex items-start', [
+                renderIcon(Icons.AlertTriangle, 20, 'text-red-500 mr-3 mt-1'),
+                h('div', '', [
+                    h('h4', 'text-red-400 font-bold', 'Action Required: Remediation'),
+                    h('p', 'text-red-200 text-sm mt-1', `You have ${remediationItems.length} artifact(s) that scored below the minimum (2/4). Please revise and resubmit per CCR 20-7.`)
+                ])
+            ]) : null;
+
+            // 3. Progress and Next MTE
+            const progressCard = renderCard([
+                h('h3', 'text-purple-400 font-bold uppercase text-sm mb-4', 'Promotion Requirements'),
+                h('div', 'space-y-6', [
+                    h('div', '', [
+                        h('div', 'flex justify-between text-sm text-gray-300 mb-2', [h('span', '', 'STEM Requirements'), h('span', 'font-mono', '2/3')]),
+                        h('div', 'h-4 bg-gray-700 rounded-full overflow-hidden', h('div', 'h-full bg-purple-500', '', el => el.style.width = '66%'))
+                    ]),
+                    h('div', '', [
+                        h('div', 'flex justify-between text-sm text-gray-300 mb-2', [h('span', '', 'Leadership Logs'), h('span', 'font-mono', '4/5')]),
+                        h('div', 'h-4 bg-gray-700 rounded-full overflow-hidden', h('div', 'h-full bg-purple-500', '', el => el.style.width = '80%'))
+                    ])
+                ])
+            ], 'md:col-span-2');
+
+            const nextMTECard = renderCard([
+                h('h3', 'text-gray-400 text-sm uppercase mb-2', 'Next Major Event'),
+                h('div', 'text-2xl font-bold text-white mb-1', 'Regional FTX'),
+                h('div', 'text-purple-400 flex items-center mb-4', [renderIcon(Icons.Calendar, 16, 'mr-2'), h('span', '', 'Nov 10')]),
+                h('div', 'bg-green-900/30 text-green-400 px-3 py-2 rounded text-xs border border-green-800 flex items-center', [
+                    renderIcon(Icons.CheckCircle, 14, 'mr-2'), h('span', '', 'Recovery Period Confirmed')
+                ])
+            ], 'bg-gradient-to-br from-gray-800 to-gray-900');
+
+            // 4. Evidence Log
+            const evidenceLog = renderCard([
+                h('h3', 'text-lg font-bold text-white mb-4', 'My Evidence Portfolio'),
+                h('table', 'w-full text-left text-sm text-gray-300', [
+                    h('thead', '', h('tr', 'border-b border-gray-700 text-gray-500', [
+                        h('th', 'pb-2', 'LOE'), h('th', 'pb-2', 'Title'), h('th', 'pb-2', 'Status'), h('th', 'pb-2 text-right', 'Score')
+                    ])),
+                    h('tbody', 'divide-y divide-gray-800', myArtifacts.map(a => h('tr', '', [
+                        h('td', 'py-3', h('span', 'bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded', a.loe)),
+                        h('td', '', a.title),
+                        h('td', '', renderBadge(a.status, a.score)),
+                        h('td', 'text-right font-mono', a.score > -1 ? a.score : '-')
+                    ])))
+                ])
+            ]);
+
+            return h('div', 'space-y-6 animate-fade-in', [
+                personnelHeader,
+                remediationWarning,
+                h('div', 'grid grid-cols-1 md:grid-cols-3 gap-6', [progressCard, nextMTECard]),
+                evidenceLog
+            ].filter(Boolean));
+        };
+
+        // Render functions for other roles (simplified)
+        const renderRegionalView = () => h('div', 'text-white p-4', 'Regional Dashboard - Implementation Pending...');
+        const renderSquadronView = () => h('div', 'text-white p-4', 'Squadron Dashboard - Implementation Pending...');
+        const renderParentView = () => h('div', 'text-white p-4', 'Parent Dashboard - Implementation Pending...');
+
+
+        // --- MAIN APP LOGIC ---
+
+        const renderApp = () => {
+            const mainContent = document.getElementById('main-content');
+            const roleContainer = document.getElementById('current-role-info');
+            // Removed unused variable 'mobileMenu'
+
+            // 1. Render Main View
+            mainContent.innerHTML = '';
+            let viewElement;
+            switch (currentUser.role) {
+                case 'HQ': viewElement = renderHQView(); break;
+                case 'Cadet': viewElement = renderCadetView(); break;
+                case 'Regional': viewElement = renderRegionalView(); break;
+                case 'Squadron': viewElement = renderSquadronView(); break;
+                case 'Parent': viewElement = renderParentView(); break;
+                default: viewElement = h('div', 'text-white p-4', 'Role not found');
+            }
+            mainContent.appendChild(viewElement);
+
+            // 2. Update Header
+            document.getElementById('header-title').textContent = `${currentUser.role} Dashboard`;
+
+            // 3. Update Sidebar Profile
+            roleContainer.innerHTML = '';
+            roleContainer.appendChild(h('div', 'flex items-center space-x-3', [
+                h('div', 'w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-sm font-bold', currentUser.name.charAt(0)),
+                h('div', '', [
+                    h('div', 'text-sm font-medium text-white', currentUser.name),
+                    h('div', 'text-xs text-gray-500', `${currentUser.role} Access`)
+                ])
+            ]));
+
+            // 4. Update Sidebar Role Buttons
+            const sidebarNav = document.getElementById('sidebar-nav');
+            sidebarNav.innerHTML = '';
+            USERS.forEach(user => {
+                const isActive = currentUser.id === user.id;
+                const button = h('button', `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-purple-700 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`, [
+                    renderIcon(Icons.UserCheck, 20, 'w-5 h-5'),
+                    h('span', 'font-medium', `${user.role} View`)
+                ]);
+                button.addEventListener('click', () => {
+                    currentUser = user;
+                    mobileMenuOpen = false;
+                    renderApp();
+                    // Removed old app-container class toggle logic
+                });
+                sidebarNav.appendChild(button);
+            });
+
+            // 5. Update Mobile Menu State (CRITICAL FIX)
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                sidebar.setAttribute('data-menu-state', mobileMenuOpen ? 'open' : 'closed');
+            }
+        };
+
+        const setupEventListeners = () => {
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+            mobileMenuToggle.addEventListener('click', () => {
+                mobileMenuOpen = !mobileMenuOpen;
+                renderApp();
+            });
+        };
+
+        // Initialize App on DOM load using DOMContentLoaded for better reliability and performance
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            renderApp();
+        });
+
+    </script>
+</head>
+<body class="bg-slate-950 text-gray-100 min-h-screen">
+    <div id="app-container" class="h-screen overflow-hidden">
+        
+        <!-- Mobile Header -->
+        <div class="lg:hidden flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-purple-600 rounded-tr-lg rounded-bl-lg flex items-center justify-center font-bold">SF</div>
+                <span class="font-bold tracking-wider">SFCC OPS</span>
             </div>
-          ) : (
-            reviewQueue.map(item => (
-              <Card key={item.id} className="hover:border-purple-500 transition-colors cursor-pointer">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-mono text-purple-300 bg-purple-900/30 px-2 py-0.5 rounded">{item.loe}</span>
-                    <h4 className="text-white font-bold mt-1">{item.title}</h4>
-                    <p className="text-gray-400 text-sm">{item.cadetName} • Submitted: {item.date}</p>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedArtifact(item)}
-                    className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded text-sm font-semibold"
-                  >
-                    Review
-                  </button>
-                </div>
-              </Card>
-            ))
-          )}
-
-          {/* Recently Processed Table */}
-          <h3 className="text-gray-500 font-bold uppercase text-sm tracking-wider mt-8">Recent Actions</h3>
-          <Card>
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead>
-                <tr className="border-b border-gray-700 text-gray-500">
-                  <th className="pb-2">Cadet</th>
-                  <th className="pb-2">Artifact</th>
-                  <th className="pb-2">Score</th>
-                  <th className="pb-2">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {artifacts.filter(a => a.status !== 'Submitted').slice(0, 5).map(a => (
-                  <tr key={a.id}>
-                    <td className="py-2">{a.cadetName}</td>
-                    <td>{a.title}</td>
-                    <td className={`font-mono ${a.score < 2 ? 'text-red-400' : 'text-green-400'}`}>{a.score}/4</td>
-                    <td><Badge status={a.status} score={a.score} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+            <button id="mobile-menu-toggle">
+                <!-- Icon will be replaced by JS logic based on state -->
+                <svg id="mobile-menu-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
         </div>
 
-        {/* Side Panel: Safety & Board Readiness */}
-        <div className="space-y-6">
-           <Card>
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-               <Shield className="mr-2 text-purple-400" size={18} /> Safety Gates
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm text-gray-300 bg-gray-900 p-3 rounded">
-                <span>Pre-Flight Brief (LOE-B)</span>
-                <span className="text-green-400 font-mono">COMPLETED</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-gray-300 bg-gray-900 p-3 rounded">
-                <span>Risk Assessment (ORM)</span>
-                <span className="text-yellow-500 font-mono">PENDING</span>
-              </div>
-            </div>
-           </Card>
-
-           <Card>
-             <h3 className="text-lg font-bold text-white mb-4">Board Packet Check</h3>
-             <p className="text-xs text-gray-400 mb-3">Snapshot: Cdt. Ender</p>
-             <ul className="space-y-2 text-sm text-gray-300">
-               <li className="flex items-center"><CheckCircle size={14} className="text-green-500 mr-2"/> Minima Met (3/3)</li>
-               <li className="flex items-center"><CheckCircle size={14} className="text-green-500 mr-2"/> LOE Index Updated</li>
-               <li className="flex items-center"><AlertTriangle size={14} className="text-red-500 mr-2"/> Rubric Score Avg &gt; 2.5</li>
-             </ul>
-           </Card>
-        </div>
-      </div>
-
-      {/* Review Modal */}
-      {selectedArtifact && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-gray-800 border border-gray-600 rounded-lg max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-1">Grading: {selectedArtifact.title}</h3>
-            <p className="text-gray-400 text-sm mb-6">Cadet: {selectedArtifact.cadetName}</p>
-            
-            <div className="mb-6">
-              <label className="block text-gray-400 text-xs uppercase mb-2">Safety Verification (Required)</label>
-              <button 
-                onClick={() => setSelectedArtifact({...selectedArtifact, safetyCheck: !selectedArtifact.safetyCheck})}
-                className={`flex items-center justify-center w-full p-3 rounded border ${selectedArtifact.safetyCheck ? 'bg-green-900/30 border-green-600 text-green-400' : 'bg-gray-900 border-gray-700 text-gray-500'}`}
-              >
-                {selectedArtifact.safetyCheck ? <><CheckCircle size={18} className="mr-2"/> Safety Verified</> : 'Confirm Safety/OPSEC'}
-              </button>
-            </div>
-
-            <label className="block text-gray-400 text-xs uppercase mb-2">Assign Rubric Score (0-4)</label>
-            <div className="grid grid-cols-5 gap-2 mb-6">
-              {[0, 1, 2, 3, 4].map(score => (
-                <button
-                  key={score}
-                  onClick={() => handleScore(score)}
-                  className={`p-3 rounded font-mono font-bold transition-all ${score < 2 ? 'bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-800' : 'bg-green-900/20 hover:bg-green-900/50 text-green-400 border border-green-800'}`}
-                >
-                  {score}
-                </button>
-              ))}
-            </div>
-            
-            <p className="text-xs text-gray-500 italic text-center">
-              Note: Scores &lt; 2 will automatically trigger "Remediation Status" per CCR 20-7.
-            </p>
-            
-            <button onClick={() => setSelectedArtifact(null)} className="mt-4 w-full text-gray-400 hover:text-white py-2">Cancel</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const CadetView = ({ artifacts, events }) => {
-  const myArtifacts = artifacts.filter(a => a.cadetName === 'Cdt. E. Ender'); // Mock ID check
-  const remediationItems = myArtifacts.filter(a => a.score !== null && a.score < 2);
-  
-  // Mock Data for Profile
-  const cadetProfile = {
-     joinDate: 'Aug 15, 2022',
-     promotions: [
-       { rank: 'C/SSgt', date: 'Oct 01, 2023', active: true },
-       { rank: 'C/SrA', date: 'Feb 15, 2023' },
-       { rank: 'C/Amn', date: 'Sep 01, 2022' }
-     ],
-     awards: [
-       { name: 'Honor Flight Ribbon', earned: true, date: '2023-06-10', color: 'bg-yellow-500', type: 'Service' },
-       { name: 'Physical Excellence', earned: true, date: '2022-12-10', color: 'bg-green-600', type: 'Fitness' },
-       { name: 'Leadership Basics', earned: true, date: '2022-09-30', color: 'bg-blue-600', type: 'Leadership' },
-       { name: 'Cyber CyberBadge', earned: false, progress: 80, color: 'bg-gray-700', type: 'STEM' },
-       { name: 'Community Service', earned: false, progress: 45, color: 'bg-red-900', type: 'Service' }
-     ]
-  };
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      
-      {/* 1. Personnel Header (New) */}
-      <Card className="flex flex-col md:flex-row gap-6 items-start">
-        {/* Photo & Rank Column */}
-        <div className="flex-shrink-0 flex flex-col items-center space-y-3 w-full md:w-auto">
-            <div className="relative">
-              <img 
-                src="https://placehold.co/150x200/334155/white?text=Cadet+Photo" 
-                alt="Cadet" 
-                className="rounded-lg border-2 border-gray-600 shadow-xl object-cover"
-              />
-              <div className="absolute -bottom-3 -right-3">
-                 <img 
-                   src="https://placehold.co/48x48/4c1d95/white?text=Rk" 
-                   alt="Rank" 
-                   className="rounded-full border-4 border-gray-800 shadow-lg"
-                 />
-              </div>
-            </div>
-            
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-white">C/SSgt</h2>
-              <p className="text-xs text-purple-400 uppercase tracking-widest font-bold">Staff Sergeant</p>
-            </div>
-        </div>
-
-        {/* Bio & Stats Column */}
-        <div className="flex-grow w-full">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-3xl font-bold text-white">Cadet E. Ender</h2>
-                <div className="flex items-center text-gray-400 mt-1 space-x-4 text-sm">
-                   <span className="flex items-center"><Users size={14} className="mr-1"/> Squadron 101</span>
-                   <span className="flex items-center"><Clock size={14} className="mr-1"/> Joined {cadetProfile.joinDate}</span>
-                </div>
-              </div>
-              <div className="hidden md:block text-right">
-                 <div className="text-xs text-gray-500 uppercase tracking-wider">Next Evaluation</div>
-                 <div className="text-lg font-mono text-white">Dec 15, 2023</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Promotion Log */}
-              <div className="bg-gray-900/50 p-4 rounded border border-gray-700">
-                  <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-4 flex items-center">
-                    <ChevronUp size={14} className="mr-1"/> Promotion Log
-                  </h4>
-                  <ul className="space-y-0 relative border-l-2 border-gray-700 ml-2 pl-4">
-                    {cadetProfile.promotions.map((p, i) => (
-                      <li key={i} className="mb-4 last:mb-0 relative">
-                          <div className={`absolute -left-[21px] w-3 h-3 rounded-full border-2 border-gray-900 ${p.active ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-gray-600'}`}></div>
-                          <div className="flex justify-between items-center">
-                            <span className={`font-mono font-bold ${p.active ? 'text-white' : 'text-gray-500'}`}>{p.rank}</span>
-                            <span className="text-xs text-gray-600">{p.date}</span>
-                          </div>
-                      </li>
-                    ))}
-                  </ul>
-              </div>
-
-              {/* Awards & Ribbons */}
-              <div className="bg-gray-900/50 p-4 rounded border border-gray-700">
-                  <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-4 flex items-center">
-                    <Award size={14} className="mr-1"/> Awards & Pursuits
-                  </h4>
-                  
-                  {/* Earned Rack */}
-                  <div className="flex flex-wrap gap-1 mb-4">
-                     {cadetProfile.awards.filter(a => a.earned).map((award, i) => (
-                       <div key={i} className={`h-6 w-8 ${award.color} rounded-sm shadow-sm border border-black/20`} title={`${award.name} - Earned ${award.date}`}></div>
-                     ))}
-                  </div>
-
-                  {/* Active Pursuits */}
-                  <div className="space-y-3">
-                      {cadetProfile.awards.filter(a => !a.earned).map((award, i) => (
-                        <div key={i}>
-                          <div className="flex justify-between text-[10px] uppercase tracking-wide mb-1 text-gray-400">
-                            <span>{award.name}</span>
-                            <span>{award.progress}%</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                            <div className={`h-full ${award.color}`} style={{ width: `${award.progress}%` }}></div>
-                          </div>
+        <div class="flex h-full overflow-hidden">
+            <!-- Sidebar: uses data-menu-state for mobile toggling, which is handled in CSS/JS -->
+            <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 transform transition-transform lg:translate-x-0 lg:static -translate-x-full" data-menu-state="closed">
+                <div class="h-full flex flex-col">
+                    <div class="p-6 flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-tr-xl rounded-bl-xl flex items-center justify-center shadow-lg shadow-purple-900/50">
+                            <!-- Shield Icon placeholder -->
+                            <svg class="text-white w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.618a8 8 0 10-11.234 11.234 8 8 0 0011.234-11.234z"></path></svg>
                         </div>
-                      ))}
-                  </div>
-              </div>
-            </div>
-        </div>
-      </Card>
+                        <div>
+                            <h1 class="font-bold text-lg tracking-wider text-white leading-tight">SFCC<br/><span class="text-purple-400 text-xs font-normal uppercase">Command Suite</span></h1>
+                        </div>
+                    </div>
 
-      {/* 2. Existing Warnings & Progress */}
-      {remediationItems.length > 0 && (
-        <div className="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r flex items-start">
-           <AlertTriangle className="text-red-500 mr-3 mt-1" size={20} />
-           <div>
-             <h4 className="text-red-400 font-bold">Action Required: Remediation</h4>
-             <p className="text-red-200 text-sm mt-1">
-               You have {remediationItems.length} artifact(s) that scored below the minimum (2/4). 
-               Please revise and resubmit per CCR 20-7.
-             </p>
-           </div>
-        </div>
-      )}
+                    <nav id="sidebar-nav" class="flex-1 px-4 space-y-2 mt-4">
+                        <div class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-2 px-4">Role Simulator</div>
+                        <!-- Role buttons rendered by JS -->
+                    </nav>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Progress Card */}
-        <Card className="md:col-span-2">
-          <h3 className="text-purple-400 font-bold uppercase text-sm mb-4">Promotion Requirements</h3>
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between text-sm text-gray-300 mb-2">
-                <span>STEM Requirements</span>
-                <span className="font-mono">2/3</span>
-              </div>
-              <div className="h-4 bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-500" style={{ width: '66%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm text-gray-300 mb-2">
-                <span>Leadership Logs</span>
-                <span className="font-mono">4/5</span>
-              </div>
-              <div className="h-4 bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-500" style={{ width: '80%' }}></div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Next MTE */}
-        <Card className="bg-gradient-to-br from-gray-800 to-gray-900">
-           <h3 className="text-gray-400 text-sm uppercase mb-2">Next Major Event</h3>
-           <div className="text-2xl font-bold text-white mb-1">Regional FTX</div>
-           <div className="text-purple-400 flex items-center mb-4"><Calendar size={16} className="mr-2"/> Nov 10</div>
-           <div className="bg-green-900/30 text-green-400 px-3 py-2 rounded text-xs border border-green-800 flex items-center">
-             <CheckCircle size={14} className="mr-2"/> Recovery Period Confirmed
-           </div>
-        </Card>
-      </div>
-
-      {/* Evidence Log */}
-      <Card>
-        <h3 className="text-lg font-bold text-white mb-4">My Evidence Portfolio</h3>
-        <table className="w-full text-left text-sm text-gray-300">
-          <thead>
-            <tr className="border-b border-gray-700 text-gray-500">
-              <th className="pb-2">LOE</th>
-              <th className="pb-2">Title</th>
-              <th className="pb-2">Status</th>
-              <th className="pb-2 text-right">Score</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {myArtifacts.map(a => (
-              <tr key={a.id}>
-                <td className="py-3"><span className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded">{a.loe}</span></td>
-                <td>{a.title}</td>
-                <td><Badge status={a.status} score={a.score} /></td>
-                <td className="text-right font-mono">{a.score > -1 ? a.score : '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </div>
-  );
-};
-
-const ParentView = ({ events }) => (
-  <div className="space-y-6 animate-fade-in">
-    <div className="bg-gray-800 border-l-4 border-purple-500 p-6 rounded shadow-lg">
-      <h2 className="text-2xl font-bold text-white mb-2">Cadet E. Ender</h2>
-      <p className="text-gray-400">Squadron 101 • Grade: C/SSgt</p>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card>
-         <h3 className="text-lg font-bold text-white mb-4">Overall Standing</h3>
-         <div className="flex items-center justify-center p-6">
-            <div className="relative w-32 h-32 flex items-center justify-center rounded-full border-8 border-gray-700">
-              <div className="absolute inset-0 rounded-full border-8 border-purple-500 border-t-transparent animate-spin-slow" style={{ transform: 'rotate(45deg)'}}></div>
-              <span className="text-3xl font-bold text-white">Good</span>
-            </div>
-         </div>
-         <p className="text-center text-gray-400 text-sm">On track for promotion. No critical safety violations.</p>
-      </Card>
-
-      <Card>
-        <h3 className="text-lg font-bold text-white mb-4">Consent & Admin</h3>
-        <ul className="space-y-4">
-          <li className="flex justify-between items-center border-b border-gray-700 pb-2">
-            <span className="text-gray-300">Media/Photo Release</span>
-            <span className="text-green-400 flex items-center"><CheckCircle size={16} className="mr-2"/> Opted-In</span>
-          </li>
-          <li className="flex justify-between items-center border-b border-gray-700 pb-2">
-             <span className="text-gray-300">Medical Form 20-1</span>
-             <span className="text-green-400 flex items-center"><CheckCircle size={16} className="mr-2"/> Valid</span>
-          </li>
-          <li className="flex justify-between items-center pb-2">
-             <span className="text-gray-300">Dues Status</span>
-             <span className="text-gray-500 font-mono">Paid (Q3)</span>
-          </li>
-        </ul>
-      </Card>
-    </div>
-
-    <Card>
-      <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-        <Calendar className="mr-2 text-purple-400" size={20}/> Unit Schedule & Recovery
-      </h3>
-      <div className="space-y-3">
-        {events.map(ev => (
-          <div key={ev.id} className="flex items-center justify-between bg-gray-900 p-3 rounded border border-gray-800">
-            <div>
-              <div className="font-bold text-white">{ev.title}</div>
-              <div className="text-xs text-gray-500">{ev.date} • {ev.type}</div>
-            </div>
-            {ev.recovery && (
-              <div className="bg-blue-900/30 text-blue-300 text-xs px-2 py-1 rounded border border-blue-800">
-                24hr Recovery Mandated
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </Card>
-  </div>
-);
-
-// --- MAIN LAYOUT & APP ---
-
-const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${active ? 'bg-purple-700 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-  >
-    <Icon size={20} />
-    <span className="font-medium">{label}</span>
-  </button>
-);
-
-export default function SFCCDashboard() {
-  const [currentUser, setCurrentUser] = useState(USERS[0]); // Default to HQ
-  const [artifacts, setArtifacts] = useState(INITIAL_ARTIFACTS);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Simulate updating a SharePoint List Item
-  const handleUpdateArtifact = (id, updates) => {
-    setArtifacts(prev => prev.map(item => 
-      item.id === id ? { ...item, ...updates } : item
-    ));
-  };
-
-  // Determine which view to show based on Role
-  const renderView = () => {
-    switch (currentUser.role) {
-      case 'HQ': return <HQView artifacts={artifacts} />;
-      case 'Regional': return <RegionalView />;
-      case 'Squadron': return <SquadronView artifacts={artifacts} onUpdateArtifact={handleUpdateArtifact} />;
-      case 'Cadet': return <CadetView artifacts={artifacts} events={EVENTS} />;
-      case 'Parent': return <ParentView events={EVENTS} />;
-      default: return <div className="text-white">Role not found</div>;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-gray-100 font-sans selection:bg-purple-500 selection:text-white">
-      {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800">
-        <div className="flex items-center space-x-2">
-           <div className="w-8 h-8 bg-purple-600 rounded-tr-lg rounded-bl-lg flex items-center justify-center font-bold">SF</div>
-           <span className="font-bold tracking-wider">SFCC OPS</span>
-        </div>
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-          {mobileMenuOpen ? <X /> : <Menu />}
-        </button>
-      </div>
-
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 transform transition-transform lg:translate-x-0 lg:static ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="h-full flex flex-col">
-            <div className="p-6 flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-tr-xl rounded-bl-xl flex items-center justify-center shadow-lg shadow-purple-900/50">
-                <Shield className="text-white" size={24} />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg tracking-wider text-white leading-tight">SFCC<br/><span className="text-purple-400 text-xs font-normal uppercase">Command Suite</span></h1>
-              </div>
-            </div>
-
-            <nav className="flex-1 px-4 space-y-2 mt-4">
-              <div className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-2 px-4">Role Simulator</div>
-              
-              {USERS.map(user => (
-                <SidebarItem 
-                  key={user.id}
-                  icon={UserCheck} 
-                  label={`${user.role} View`} 
-                  active={currentUser.id === user.id}
-                  onClick={() => {
-                    setCurrentUser(user);
-                    setMobileMenuOpen(false);
-                  }}
-                />
-              ))}
-
-              <div className="my-6 border-t border-gray-800"></div>
-              
-              <div className="px-4 text-xs text-gray-600 uppercase mb-2">System Status</div>
-              <div className="px-4 flex items-center text-green-500 text-sm mb-1"><div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div> SharePoint: Online</div>
-              <div className="px-4 flex items-center text-green-500 text-sm"><div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div> Power BI: Synced</div>
-            </nav>
-
-            <div className="p-4 border-t border-gray-800 bg-gray-900/50">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-sm font-bold">
-                  {currentUser.name.charAt(0)}
+                    <div class="p-4 border-t border-gray-800 bg-gray-900/50">
+                        <div id="current-role-info" class="flex items-center space-x-3">
+                            <!-- Current user info rendered by JS -->
+                        </div>
+                    </div>
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-white">{currentUser.name}</div>
-                  <div className="text-xs text-gray-500">{currentUser.role} Access</div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto bg-slate-950 p-4 lg:p-8">
+                <header class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 id="header-title" class="text-2xl lg:text-3xl font-bold text-white mb-1"></h1>
+                        <p class="text-gray-400 text-sm flex items-center">
+                             <!-- Lock Icon placeholder -->
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            Secure Connection • Neutral Portfolio v2.4
+                        </p>
+                    </div>
+                    <div class="hidden md:block">
+                       <span class="bg-purple-900/30 text-purple-300 border border-purple-800 px-3 py-1 rounded-full text-xs font-mono">
+                         Term: Fall 2023
+                       </span>
+                    </div>
+                </header>
+
+                <div id="main-content">
+                    <!-- Content (HQ, Cadet, etc. View) is rendered here by JS -->
                 </div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto bg-slate-950 p-4 lg:p-8">
-          <header className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white mb-1">{currentUser.role} Dashboard</h1>
-              <p className="text-gray-400 text-sm flex items-center">
-                 <Lock size={12} className="mr-1"/> Secure Connection • Neutral Portfolio v2.4
-              </p>
-            </div>
-            <div className="hidden md:block">
-               <span className="bg-purple-900/30 text-purple-300 border border-purple-800 px-3 py-1 rounded-full text-xs font-mono">
-                 Term: Fall 2023
-               </span>
-            </div>
-          </header>
-
-          {renderView()}
-        </main>
-      </div>
+            </main>
+        </div>
     </div>
-  );
-}
+</body>
+</html>
